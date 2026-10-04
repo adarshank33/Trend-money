@@ -1,0 +1,21 @@
+digraph TrendMoney {
+  rankdir=TB;
+  node [shape=box, style="rounded"];
+
+  frontend [label="Next.js Frontend"];
+  gateway [label="API Gateway\nJWT validation + routing"];
+  auth [label="Auth Service\nauth_db"];
+  product [label="Product Service\nproduct_db"];
+  order [label="Order Service\norder_db"];
+  portfolio [label="Portfolio Service\nportfolio_db"];
+  kafka [label="Kafka\norders.created\norders.processing\norders.completed\norders.failed"];
+
+  frontend -> gateway [label="REST"];
+  gateway -> auth [label="REST"];
+  gateway -> product [label="REST"];
+  gateway -> order [label="REST"];
+  gateway -> portfolio [label="REST"];
+  order -> kafka [label="publish / consume"];
+  kafka -> portfolio [label="orders.completed"];
+  order -> product [label="REST"];
+}

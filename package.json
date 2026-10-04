@@ -1,0 +1,14 @@
+{
+  "name": "trend-money-assignment",
+  "private": true,
+  "scripts": {
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "format": "prettier --write \"services/**/*.ts\" \"frontend/**/*.{ts,tsx}\" \"*.json\" \"*.yml\" \"*.js\"",
+    "format:check": "prettier --check \"services/**/*.ts\" \"frontend/**/*.{ts,tsx}\" \"*.json\" \"*.yml\" \"*.js\""
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2"
+  }
+}

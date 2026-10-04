@@ -1,0 +1,231 @@
+services:
+  mongodb:
+    image: mongo:8
+    container_name: trend-money-mongodb
+    restart: unless-stopped
+
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+
+    ports:
+      - "${MONGO_PORT}:27017"
+
+    volumes:
+      - mongo_data:/data/db
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "--quiet",
+          "--eval",
+          "db.adminCommand('ping').ok"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+
+  kafka:
+    image: apache/kafka:4.1.0
+    container_name: trend-money-kafka
+    restart: unless-stopped
+
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+    ports:
+      - "${KAFKA_EXTERNAL_PORT}:9094"
+
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 15s
+
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+
+    container_name: trend-money-auth
+    restart: unless-stopped
+
+    environment:
+      PORT: 3001
+
+      MONGO_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${AUTH_DB_NAME}?authSource=admin
+
+      JWT_SECRET: ${JWT_SECRET}
+
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+
+  product-service:
+    build:
+      context: ./services/product-service
+
+    container_name: trend-money-product
+    restart: unless-stopped
+
+    environment:
+      PORT: 3002
+
+      MONGO_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${PRODUCT_DB_NAME}?authSource=admin
+
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+
+  order-service:
+    build:
+      context: ./services/order-service
+
+    container_name: trend-money-order
+    restart: unless-stopped
+
+    environment:
+      PORT: 3003
+
+      MONGO_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${ORDER_DB_NAME}?authSource=admin
+
+      PRODUCT_SERVICE_URL: http://product-service:3002
+
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: ${ORDER_KAFKA_CLIENT_ID}
+      KAFKA_GROUP_ID: ${ORDER_KAFKA_GROUP_ID}
+
+      KAFKA_TOPIC_ORDER_CREATED: ${KAFKA_TOPIC_ORDER_CREATED}
+      KAFKA_TOPIC_ORDER_PROCESSING: ${KAFKA_TOPIC_ORDER_PROCESSING}
+      KAFKA_TOPIC_ORDER_COMPLETED: ${KAFKA_TOPIC_ORDER_COMPLETED}
+      KAFKA_TOPIC_ORDER_FAILED: ${KAFKA_TOPIC_ORDER_FAILED}
+
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+      kafka:
+        condition: service_healthy
+
+      product-service:
+        condition: service_started
+
+
+  portfolio-service:
+    build:
+      context: ./services/portfolio-service
+
+    container_name: trend-money-portfolio
+    restart: unless-stopped
+
+    environment:
+      PORT: 3004
+
+      MONGO_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/${PORTFOLIO_DB_NAME}?authSource=admin
+
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: ${PORTFOLIO_KAFKA_CLIENT_ID}
+      KAFKA_GROUP_ID: ${PORTFOLIO_KAFKA_GROUP_ID}
+
+      KAFKA_TOPIC_ORDER_COMPLETED: ${KAFKA_TOPIC_ORDER_COMPLETED}
+
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+      kafka:
+        condition: service_healthy
+
+
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+
+    container_name: trend-money-gateway
+    restart: unless-stopped
+
+    ports:
+      - "${API_GATEWAY_PORT}:3000"
+
+    environment:
+      PORT: 3000
+
+      JWT_SECRET: ${JWT_SECRET}
+
+      AUTH_SERVICE_URL: http://auth-service:3001
+      PRODUCT_SERVICE_URL: http://product-service:3002
+      ORDER_SERVICE_URL: http://order-service:3003
+      PORTFOLIO_SERVICE_URL: http://portfolio-service:3004
+
+      FRONTEND_URL: http://localhost:${FRONTEND_PORT}
+
+    depends_on:
+      auth-service:
+        condition: service_started
+
+      product-service:
+        condition: service_started
+
+      order-service:
+        condition: service_started
+
+      portfolio-service:
+        condition: service_started
+
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+
+    container_name: trend-money-frontend
+    restart: unless-stopped
+
+    ports:
+      - "${FRONTEND_PORT}:3000"
+
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+
+    depends_on:
+      api-gateway:
+        condition: service_started
+
+
+volumes:
+  mongo_data:
+  kafka_data:
