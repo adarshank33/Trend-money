@@ -1,15 +1,13 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Req,
-  Res
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Req, Res } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { GatewayService } from './gateway.service';
+import {
+  RegisterSwaggerDto,
+  LoginSwaggerDto,
+  CreateProductSwaggerDto,
+  UpdateProductSwaggerDto,
+  CreateOrderSwaggerDto
+} from './swagger.dto';
 
 @Controller()
 export class GatewayController {
@@ -19,7 +17,7 @@ export class GatewayController {
   register(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-    @Body() body: unknown
+    @Body() body: RegisterSwaggerDto
   ) {
     return this.gateway.forward(
       'POST',
@@ -35,7 +33,7 @@ export class GatewayController {
   login(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-    @Body() body: unknown
+    @Body() body: LoginSwaggerDto
   ) {
     return this.gateway.forward(
       'POST',
@@ -87,7 +85,7 @@ export class GatewayController {
   }
 
   @Post('products')
-  createProduct(@Req() req: Request, @Body() body: unknown) {
+  createProduct(@Req() req: Request, @Body() body: CreateProductSwaggerDto) {
     return this.gateway.forward(
       'POST',
       this.gateway.productUrl('/products'),
@@ -101,7 +99,7 @@ export class GatewayController {
   updateProduct(
     @Req() req: Request,
     @Param('id') id: string,
-    @Body() body: unknown
+    @Body() body: UpdateProductSwaggerDto
   ) {
     return this.gateway.forward(
       'PATCH',
@@ -113,7 +111,7 @@ export class GatewayController {
   }
 
   @Post('orders')
-  createOrder(@Req() req: Request, @Body() body: unknown) {
+  createOrder(@Req() req: Request, @Body() body: CreateOrderSwaggerDto) {
     return this.gateway.forward(
       'POST',
       this.gateway.orderUrl('/orders'),

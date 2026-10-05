@@ -5,7 +5,7 @@ digraph TrendMoney {
   frontend [label="Next.js Frontend"];
   gateway [label="API Gateway\nJWT validation + routing"];
   auth [label="Auth Service\nauth_db"];
-  product [label="Product Service\nproduct_db"];
+  product [label="Product Service\nproduct_dbb"];
   order [label="Order Service\norder_db"];
   portfolio [label="Portfolio Service\nportfolio_db"];
   kafka [label="Kafka\norders.created\norders.processing\norders.completed\norders.failed"];
